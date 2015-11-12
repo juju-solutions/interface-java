@@ -26,6 +26,7 @@ class JavaRequires(RelationBase):
     def departed(self):
         self.remove_state('{relation_name}.connected')
 
+    # Send relation data when java is ready
     def set_ready(self, java_home, java_version):
         self.set_remote(data={
             'java-ready': True,
@@ -33,8 +34,9 @@ class JavaRequires(RelationBase):
             'java-version': java_version,
         })
 
-    def unset_ready(self):
-        self.set_remote('java-ready', False)
-
+    # For minor upgrades, provide a way to set java-version independently
     def set_version(self, version):
         self.set_remote('java-version', version)
+
+    def unset_ready(self):
+        self.set_remote('java-ready', False)

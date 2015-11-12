@@ -17,6 +17,8 @@ from charms.reactive import scopes
 
 class JavaProvides(RelationBase):
     scope = scopes.GLOBAL
+
+    # convenient way to provide accessor methods
     auto_accessors = ['java-home', 'java-version']
 
     def java_ready(self):

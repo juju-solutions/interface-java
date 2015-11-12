@@ -1,30 +1,46 @@
 # Overview
 
-This interface layer handles the communication with Java related services via the
-`java-interface` interface protocol.  It will set one state when appropriate:
+This interface layer handles the communication with Java related services via
+the `java` interface protocol.  It sets two states when appropriate:
 
-  * `{relation_name}.ready` indicates that Java is available
+  * `{relation_name}.connected` indicates that a Java relation is present
+  * `{relation_name}.ready` indicates that Java is installed and ready
 
-In addition, the charm providing this relation (e.g., [openjdk-jre][])
-will install a JRE and Java libraries, and will configure the environment in
-`/etc/environment`.
+The charm implementing this relation (e.g., [openjdk][]) will install and
+configure the Java environment. It also sets two pieces of relation data:
+
+  * `java-home` is equivalent to the $JAVA_HOME environment variable
+  * `java-version` is the numeric version string (e.g. "1.7.0_85")
+
+The charm consuming this relation (e.g., [ubuntu-java][]) will use the above
+relation data to configure its Java based service.
 
 
 # Example Usage
 
 An example of a charm using this interface would be:
 
-TODO: make this more better.  talk provides and requires
-
 ```python
 @when('java.connected')
+@when_not('java.installed')
 def install():
-    jre.install()
+    status_set('maintenance', 'Installing JRE')
+    java.install_jre()
+    reactive.set_state('java.installed')
+    hookenv.status_set('active', 'JRE is installed')
 
-@when('java.connected')
-def java_ready(java):
-    jre.configure()
-    status_set('active', 'OpenJDK JRE is ready')
+@when('java.connected', 'java.installed')
+def configure():
+    # update /etc/environment, call update-alternatives, etc
+    java.configure_jre()
+    hookenv.status_set('active', 'JRE is ready')
+
+@when_not('java.connected')
+@when('java.installed')
+def uninstall():
+    java.uninstall_jre()
+    reactive.remove_state('java.installed')
+    hookenv.status_set('blocked', 'No JRE available')
 ```
 
 
@@ -38,4 +54,5 @@ def java_ready(java):
 - [OpenJDK](http://openjdk.java.net/) home page
 
 
-[openjdk-jre]: https://jujucharms.com/apache-hadoop-plugin/
+[openjdk]: https://jujucharms.com/u/kwmonroe/openjdk
+[ubuntu-java]: https://jujucharms.com/u/kwmonroe/ubuntu-java

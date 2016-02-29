@@ -1,36 +1,71 @@
 # Overview
 
-This interface layer handles the communication with Java related services via
-the `java` interface protocol.  It sets two states when appropriate:
+This interface layer handles the communication between charms needing a Java
+runtime (JRE or JDK) and subordinate charms which deliver that runtime.
+
+
+# Usage
+
+## Charms needing a Java runtime
+
+Charms needing a Java runtime must `provide` a relation endpoint using the
+`java` interface protocol in their `metadata.yaml` file and `include` this
+interface layer in their `layer.yaml` file.  Then, they can watch for the
+following reactive states:
 
   * `{relation_name}.connected` indicates that a Java relation is present
+    (this is mainly used for reporting if the relation is missing, via status)
   * `{relation_name}.ready` indicates that Java is installed and ready
 
-The charm implementing this relation (e.g., [openjdk][]) will install and
-configure the Java environment. It also sets two pieces of relation data:
+The relation also provides the following methods for getting information about
+the Java runtime:
 
-  * `java-home` is equivalent to the $JAVA_HOME environment variable
-  * `java-version` is the numeric version string (e.g. "1.7.0_85")
+  * `java_home()` provides the path that the `JAVA_HOME` env var should be set to
+  * `java_version()` provides the major version of Java that was installed
 
-The charm consuming this relation (e.g., [ubuntu-java][]) will use the above
-relation data to configure its Java based service.
+An example of how a charm might use this would be:
+
+```python
+@when_not('java.ready')
+def missing_java():
+    hookenv.status_set('blocked', 'Missing JRE')
+
+@when('java.ready')
+@when_not('mysoftware.installed')
+def install_software(java):
+    mysoftware.install(java.java_home(), java.java_version())
+    set_state('mysoftware.installed')
+    hookenv.status_set('active', 'Ready')
+```
 
 
-# Example Usage
+## Charms delivering a Java runtime
 
-An example of a charm using this interface would be:
+Charms delivering a Java runtime must be subordinate, and they must `require`
+a relation endpoint using the `java` interface protocol in their `metadata.yaml`
+file and `include` this interface layer in their `layer.yaml` file.  Then, they
+can watch for the following reactive states:
+
+  * `{relation_name}.connected` indicates that a Java relation is present.
+    The charm should then perform the installation and call the following methods
+    to provide the necessary information about the Java runtime that was installed:
+    * `set_ready(java_home, java_version)`
+    * `set_version(java_version)` (for upgrades)
+
+An example of how a charm might use this would be:
 
 ```python
 @when('java.connected')
 @when_not('java.installed')
-def install():
+def install(client):
     status_set('maintenance', 'Installing JRE')
     java.install_jre()
+    client.set_ready(java.get_home(), java.get_version())
     reactive.set_state('java.installed')
     hookenv.status_set('active', 'JRE is installed')
 
 @when('java.connected', 'java.installed')
-def configure():
+def configure(client):
     # update /etc/environment, call update-alternatives, etc
     java.configure_jre()
     hookenv.status_set('active', 'JRE is ready')
